@@ -1,0 +1,46 @@
+# Falix Node 2 — auto-restart keeper (near-continuous coverage)
+#
+# HOW THE COVERAGE WORKS
+#   cron fires every 5 minutes; each job then loops internally for ~4.5 minutes
+#   polling every 45 s, so the server is checked almost all the time and a stop
+#   is normally noticed within ~1 minute.
+#
+# WHY A PUBLIC REPO IS REQUIRED
+#   Scheduled workflows on a PRIVATE repo burn the 2,000 free Actions minutes per
+#   month.  A 5-minute cadence with a 4.5-minute job needs ~3,900 min/month, so a
+#   private repo runs dry mid-month and the workflow silently stops — that is
+#   exactly what caused the 3-hour outage on 2026-10-28.
+#   Public repos get unlimited standard-runner minutes.
+name: falix-keeper
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+concurrency:
+  group: falix-keeper
+  cancel-in-progress: false
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet websockets
+      - name: keep Falix Node 2 online
+        env:
+          FALIX_API_KEY: ${{ secrets.FALIX_API_KEY }}
+          FALIX_SERVER_ID: "3521489"
+          FALIX_PROBE_HOST: "157.90.205.61"
+          FALIX_PROBE_PORT: "23132"
+          FALIX_PROBE_SNI: "mrphon3.falix.org"
+          POLL_SECONDS: "45"
+          POLICY_BACKOFF_SECONDS: "120"
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+        run: python3 keeper.py --loop --max-runtime 270
+      - name: show restart counter
+        if: always()
+        run: cat keeper-state.json 2>/dev/null || echo "no restarts in this run"
