@@ -219,6 +219,18 @@ def tick(verbose=True):
             d = bump(str(code))
             if code == "verification_required":
                 log(f"VERIFICATION REQUIRED — open within 5 min: {url}")
+                # surface the one-click link in the Actions run summary (phone-friendly)
+                summ = os.environ.get("GITHUB_STEP_SUMMARY")
+                if summ:
+                    try:
+                        with open(summ, "a") as fh:
+                            fh.write("## Falix needs a click to start\n\n"
+                                     f"[Start the server now]({url})\n\n"
+                                     "GitHub Actions cannot complete Falix's captcha, so this one "
+                                     "click must come from a human. Link expires in ~5 minutes; "
+                                     "a fresh one is issued on the next check.\n")
+                    except Exception:
+                        pass
                 alert(f"Falix needs a HUMAN verification (captcha) before it will start. "
                       f"Open within 5 minutes: {url} | total_restarts={d['restarts_total']}")
             else:
